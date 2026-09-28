@@ -344,6 +344,8 @@ Rules
 ---
 
 SECTION 77 — BACKTEST / LIVE SEPARATION
+Paper-analysis and live-alert modes must use only information that was available at the exact decision timestamp.
+No future information may be used to justify an earlier signal.
 
 1. Backtest and live environments must remain logically separate.
 2. Live scanner must never use future candles.
@@ -443,6 +445,8 @@ SECTION 80 — SECURITY & SECRETS
 ---
 
 SECTION 81 — HEALTH SCORE & DEGRADED MODES
+Bybit WebSocket or REST failure must not automatically block or invalidate a Binance-authoritative signal. Bybit remains a verification/context source under Sections 63–64. If Bybit is unavailable, cross-verification must be marked UNAVAILABLE or PARTIAL according to the configured state. If a specific signal has a configured requirement for Bybit cross-verification, missing verification may prevent that signal from reaching the required confirmation state. Binance execution-data failure may block confirmation when required Binance-authoritative data is unavailable.
+
 
 System health is separate from market-signal confidence.
 
@@ -477,6 +481,8 @@ Rules
 5. Recovery must be explicitly recorded.
 
 ---
+
+EMERGENCY MARKET SHOCK ALERT: The scanner must detect configured market-wide shock conditions using timestamp-valid market data and generate a PRIORITY EMERGENCY ALERT through the existing Telegram alert system. The alert must include event timestamp, affected market/symbol scope, detected shock condition, data freshness/status, and catalyst/news status. This alert is informational only and must not authorize or execute trades. Later-discovered information must not justify an earlier alert decision.
 
 SECTION 82 — RECOVERY & RESTART CONSISTENCY
 
@@ -540,6 +546,8 @@ Market alerts and system-health alerts must remain distinguishable.
 ---
 
 SECTION 84 — AUDIT EXPORT
+At the exact time this signal was generated, what information did the scanner actually have? The audit must preserve the timestamped information available at the decision moment and allow the original decision to be reconstructed without hindsight.
+
 
 The system must support exporting a complete signal audit package.
 
