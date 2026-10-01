@@ -109,6 +109,14 @@ def calculate_order_book_liquidity_concentration(symbol, limit=20):
     ask_concentration = (top_ask / ask_depth * 100) if ask_depth else 0.0
     return {"symbol": symbol, "bid_concentration_percent": bid_concentration, "ask_concentration_percent": ask_concentration}
 
+def detect_order_book_walls(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    largest_bid = max(bids, key=lambda x: float(x[0]) * float(x[1])) if bids else None
+    largest_ask = max(asks, key=lambda x: float(x[0]) * float(x[1])) if asks else None
+    return {"symbol": symbol, "largest_bid": largest_bid, "largest_ask": largest_ask}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
