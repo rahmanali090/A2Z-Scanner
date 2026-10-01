@@ -264,3 +264,10 @@ def get_recent_futures_listings(since_timestamp):
         if market.get("onboard_date") is not None
         and market["onboard_date"] >= since_timestamp
     ]
+
+def get_non_trading_futures_markets():
+    markets = get_futures_market_status()
+    return [
+        market for market in markets
+        if market.get("status") != "TRADING"
+    ]
