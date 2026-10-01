@@ -97,6 +97,18 @@ def calculate_order_book_depth_ratio(symbol, limit=20):
     ratio = (bid_depth / ask_depth) if ask_depth else 0.0
     return {"symbol": symbol, "bid_depth": bid_depth, "ask_depth": ask_depth, "depth_ratio": ratio}
 
+def calculate_order_book_liquidity_concentration(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    bid_depth = sum(float(x[0]) * float(x[1]) for x in bids)
+    ask_depth = sum(float(x[0]) * float(x[1]) for x in asks)
+    top_bid = float(bids[0][0]) * float(bids[0][1]) if bids else 0.0
+    top_ask = float(asks[0][0]) * float(asks[0][1]) if asks else 0.0
+    bid_concentration = (top_bid / bid_depth * 100) if bid_depth else 0.0
+    ask_concentration = (top_ask / ask_depth * 100) if ask_depth else 0.0
+    return {"symbol": symbol, "bid_concentration_percent": bid_concentration, "ask_concentration_percent": ask_concentration}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
