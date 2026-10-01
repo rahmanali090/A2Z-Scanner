@@ -57,6 +57,18 @@ def calculate_order_book_imbalance(symbol, limit=20):
     imbalance_percent = ((bid_volume - ask_volume) / total_volume * 100) if total_volume else 0.0
     return {"symbol": symbol, "bid_volume": bid_volume, "ask_volume": ask_volume, "imbalance_percent": imbalance_percent}
 
+def calculate_order_book_spread(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    if not bids or not asks:
+        return {"symbol": symbol, "spread": 0.0, "spread_percent": 0.0}
+    best_bid = float(bids[0][0])
+    best_ask = float(asks[0][0])
+    spread = best_ask - best_bid
+    spread_percent = (spread / best_bid * 100) if best_bid else 0.0
+    return {"symbol": symbol, "best_bid": best_bid, "best_ask": best_ask, "spread": spread, "spread_percent": spread_percent}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
