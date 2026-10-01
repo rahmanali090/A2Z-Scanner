@@ -47,6 +47,16 @@ def get_order_book(symbol, limit=20):
     r.raise_for_status()
     return r.json()
 
+def calculate_order_book_imbalance(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    bid_volume = sum(float(x[1]) for x in bids)
+    ask_volume = sum(float(x[1]) for x in asks)
+    total_volume = bid_volume + ask_volume
+    imbalance_percent = ((bid_volume - ask_volume) / total_volume * 100) if total_volume else 0.0
+    return {"symbol": symbol, "bid_volume": bid_volume, "ask_volume": ask_volume, "imbalance_percent": imbalance_percent}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
