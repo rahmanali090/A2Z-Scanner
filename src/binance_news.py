@@ -163,3 +163,24 @@ def detect_news_signal_conflict(symbol, signal_direction, max_age_hours=24):
             })
 
     return conflicts
+
+def get_worldwide_crypto_news(limit=20):
+    """Fetch recent worldwide crypto news for context/confirmation."""
+    import requests
+
+    url = "https://cryptocurrency.cv/api/news"
+    response = requests.get(url, params={"limit": limit}, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    articles = data.get("articles", [])
+    return [
+        {
+            "source": item.get("source"),
+            "title": item.get("title"),
+            "published_at": item.get("pubDate"),
+            "url": item.get("link"),
+        }
+        for item in articles
+        if item.get("title")
+    ][:limit]
