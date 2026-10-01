@@ -410,3 +410,7 @@ def calculate_open_interest_change(symbol, interval_seconds=3):
     after = float(second["openInterest"])
     change_percent = ((after - before) / before) * 100 if before else 0.0
     return {"symbol": symbol, "oi_before": before, "oi_after": after, "oi_change_percent": round(change_percent, 6)}
+
+
+def calculate_funding_rate_intelligence(symbol):
+    x=get_funding_rate(symbol); r=float(x.get("lastFundingRate",0)); return {"symbol":symbol,"funding_rate":r,"funding_rate_percent":r*100,"next_funding_time":x.get("nextFundingTime")}
