@@ -80,6 +80,14 @@ def calculate_order_book_mid_price(symbol, limit=20):
     mid_price = (best_bid + best_ask) / 2
     return {"symbol": symbol, "mid_price": mid_price}
 
+def calculate_order_book_depth(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    bid_depth = sum(float(x[0]) * float(x[1]) for x in bids)
+    ask_depth = sum(float(x[0]) * float(x[1]) for x in asks)
+    return {"symbol": symbol, "bid_depth": bid_depth, "ask_depth": ask_depth, "total_depth": bid_depth + ask_depth}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
