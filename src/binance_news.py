@@ -216,3 +216,21 @@ def filter_worldwide_news(articles, symbol=None, max_age_hours=24):
             results.append(item)
 
     return results
+def confirm_worldwide_news(articles):
+    grouped = {}
+    for article in articles or []:
+        title = (article.get("title") or "").strip()
+        if not title:
+            continue
+        key = " ".join(title.lower().split()[:8])
+        grouped.setdefault(key, []).append(article)
+
+    confirmed = []
+    for items in grouped.values():
+        sources = {item.get("source") for item in items if item.get("source")}
+        item = dict(items[0])
+        item["source_count"] = len(sources)
+        item["multi_source_confirmed"] = len(sources) >= 2
+        confirmed.append(item)
+
+    return confirmed
