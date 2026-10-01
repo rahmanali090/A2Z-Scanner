@@ -234,3 +234,16 @@ def confirm_worldwide_news(articles):
         confirmed.append(item)
 
     return confirmed
+def build_worldwide_news_intelligence(symbol=None, limit=20, max_age_hours=24):
+    articles = get_worldwide_crypto_news(limit)
+    relevant = filter_worldwide_news(
+        articles, symbol=symbol, max_age_hours=max_age_hours
+    )
+    confirmed = confirm_worldwide_news(relevant)
+    return {
+        "symbol": symbol,
+        "article_count": len(articles),
+        "relevant_count": len(relevant),
+        "confirmed_count": len(confirmed),
+        "articles": confirmed,
+    }
