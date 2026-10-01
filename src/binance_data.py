@@ -414,3 +414,21 @@ def calculate_open_interest_change(symbol, interval_seconds=3):
 
 def calculate_funding_rate_intelligence(symbol):
     x=get_funding_rate(symbol); r=float(x.get("lastFundingRate",0)); return {"symbol":symbol,"funding_rate":r,"funding_rate_percent":r*100,"next_funding_time":x.get("nextFundingTime")}
+
+
+def calculate_volume_volatility_intelligence(symbol, interval="1h", limit=100):
+    candles=get_klines(symbol, interval, limit); closes=[float(x[4]) for x in candles]; volumes=[float(x[5]) for x in candles]
+    if len(closes)<2: return {"symbol":symbol,"interval":interval,"volume":0,"volume_change_percent":0,"volatility_percent":0}
+    prev=volumes[-2] if len(volumes)>1 else 0; vc=((volumes[-1]-prev)/prev*100) if prev else 0
+    returns=[(closes[i]-closes[i-1])/closes[i-1]*100 for i in range(1,len(closes)) if closes[i-1]]; r=returns[-20:]
+    v=(sum(x*x for x in r)/len(r))**0.5 if r else 0
+    return {"symbol":symbol,"interval":interval,"volume":volumes[-1],"volume_change_percent":vc,"volatility_percent":v}
+
+
+def calculate_long_short_positioning(symbol, period="1h", limit=30):
+    r=requests.get(f"{BINANCE_BASE_URL}/futures/data/globalLongShortAccountRatio",params={"symbol":symbol,"period":period,"limit":limit},timeout=10); r.raise_for_status(); x=r.json(); z=x[-1] if x else {}
+    return {"symbol":symbol,"period":period,"long_account_percent":float(z.get("longAccount",0))*100,"short_account_percent":float(z.get("shortAccount",0))*100,"long_short_ratio":float(z.get("longShortRatio",0))}
+
+
+def detect_market_anomaly(symbol, interval="1h"):
+    x=calculate_volume_volatility_intelligence(symbol,interval); return {"symbol":symbol,"interval":interval,"volume_anomaly":abs(x["volume_change_percent"])>=100,"volatility_anomaly":x["volatility_percent"]>=3,"volume_change_percent":x["volume_change_percent"],"volatility_percent":x["volatility_percent"]}
