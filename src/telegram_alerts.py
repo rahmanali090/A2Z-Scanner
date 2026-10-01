@@ -16,7 +16,7 @@ def send_inverted_hammer_alert(pattern, levels):
     candle_time = datetime.fromtimestamp(
         float(pattern["candle_close_time"]) / 1000,
         tz=ZoneInfo("Asia/Karachi")
-    ).strftime("%Y-%m-%d %I:%M:%S %p PKT")
+    ).strftime("%I:%M:%S %p PKT")
     def fmt(value):
         return f"{float(value):.8f}".rstrip("0").rstrip(".")
     message = (
