@@ -5,10 +5,26 @@ from src.binance_news import refresh_alpha_catalysts
 from src.btc_context import build_btc_context as get_btc_context
 
 PRIORITY_SYMBOLS = {
-    "ETHUSDT", "SOLUSDT", "XRPUSDT", "XMRUSDT", "KSMUSDT",
-    "ETCUSDT", "LINKUSDT", "ENAUSDT", "SUIUSDT", "NEARUSDT",
-    "BANKUSDT", "UNIUSDT", "ICPUSDT", "INJUSDT", "DOTUSDT",
-    "ADAUSDT", "ARBUSDT", "APTUSDT", "HYPEUSDT", "DOTUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "XMRUSDT",
+    "KSMUSDT",
+    "ETCUSDT",
+    "LINKUSDT",
+    "ENAUSDT",
+    "SUIUSDT",
+    "NEARUSDT",
+    "BANKUSDT",
+    "UNIUSDT",
+    "ICPUSDT",
+    "INJUSDT",
+    "DORUSDT",
+    "ADAUSDT",
+    "ARBUSDT",
+    "APTUSDT",
+    "HYPEUSDT",
+    "DOTUSDT",
 }
 
 
