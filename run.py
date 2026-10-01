@@ -19,7 +19,6 @@ PRIORITY_SYMBOLS = {
     "UNIUSDT",
     "ICPUSDT",
     "INJUSDT",
-    "DORUSDT",
     "ADAUSDT",
     "ARBUSDT",
     "APTUSDT",
