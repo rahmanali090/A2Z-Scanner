@@ -271,3 +271,30 @@ def get_non_trading_futures_markets():
         market for market in markets
         if market.get("status") != "TRADING"
     ]
+
+def detect_rapid_price_move(symbol, interval="15m", threshold_percent=2.0):
+    candles = get_klines(symbol, interval=interval, limit=4)
+    completed = candles[:-1]
+    if len(completed) < 3:
+        return None
+
+    start_price = float(completed[-3][1])
+    end_price = float(completed[-1][4])
+    if start_price == 0:
+        return None
+
+    change_percent = ((end_price - start_price) / start_price) * 100
+
+    if change_percent >= threshold_percent:
+        direction = "PUMP"
+    elif change_percent <= -threshold_percent:
+        direction = "DUMP"
+    else:
+        direction = "NORMAL"
+
+    return {
+        "symbol": symbol,
+        "interval": interval,
+        "change_percent": round(change_percent, 4),
+        "direction": direction,
+    }
