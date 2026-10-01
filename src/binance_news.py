@@ -234,15 +234,70 @@ def confirm_worldwide_news(articles):
         confirmed.append(item)
 
     return confirmed
+def get_worldwide_macro_news(limit=20):
+    """Fetch recent global macro/economic news and major policy releases."""
+    import requests
+    import xml.etree.ElementTree as ET
+
+    queries = [
+        "FOMC Federal Reserve",
+        "PPI inflation",
+        "CPI inflation",
+        "NFP Nonfarm Payrolls",
+        "GDP economic growth",
+        "central bank interest rates",
+    ]
+    articles = []
+    for query in queries:
+        try:
+            response = requests.get(
+                "https://news.google.com/rss/search",
+                params={"q": query, "hl": "en-US", "gl": "US", "ceid": "US:en"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+            for item in root.findall("./channel/item")[:max(3, limit // len(queries))]:
+                title = item.findtext("title")
+                link = item.findtext("link")
+                published = item.findtext("pubDate")
+                source = item.findtext("source") or "Google News"
+                if title:
+                    articles.append({
+                        "source": source,
+                        "title": title,
+                        "published_at": published,
+                        "url": link,
+                        "category": "GLOBAL_MACRO",
+                    })
+        except Exception:
+            continue
+
+    seen = set()
+    unique = []
+    for item in articles:
+        key = (item.get("title"), item.get("url"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique[:limit]
+
+
 def build_worldwide_news_intelligence(symbol=None, limit=20, max_age_hours=24):
-    articles = get_worldwide_crypto_news(limit)
+    crypto_articles = get_worldwide_crypto_news(limit)
+    macro_articles = get_worldwide_macro_news(limit)
+    articles = crypto_articles + macro_articles
+
     relevant = filter_worldwide_news(
         articles, symbol=symbol, max_age_hours=max_age_hours
     )
     confirmed = confirm_worldwide_news(relevant)
+
     return {
         "symbol": symbol,
         "article_count": len(articles),
+        "crypto_count": len(crypto_articles),
+        "macro_count": len(macro_articles),
         "relevant_count": len(relevant),
         "confirmed_count": len(confirmed),
         "articles": confirmed,
