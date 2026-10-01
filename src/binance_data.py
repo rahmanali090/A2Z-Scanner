@@ -298,3 +298,45 @@ def detect_rapid_price_move(symbol, interval="15m", threshold_percent=2.0):
         "change_percent": round(change_percent, 4),
         "direction": direction,
     }
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def scan_rapid_price_moves(interval="15m", threshold_percent=2.0, max_workers=8):
+    symbols = get_usdt_futures_symbols()
+    results = []
+    failures = []
+
+    def scan(symbol):
+        try:
+            result = detect_rapid_price_move(
+                symbol, interval=interval, threshold_percent=threshold_percent
+            )
+            return symbol, result, None
+        except Exception as exc:
+            return symbol, None, str(exc)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(scan, symbol) for symbol in symbols]
+        for future in as_completed(futures):
+            symbol, result, error = future.result()
+            if error:
+                failures.append({"symbol": symbol, "error": error})
+            elif result and result["direction"] in ("PUMP", "DUMP"):
+                results.append(result)
+
+    return {
+        "scanned": len(symbols),
+        "signals": results,
+        "failures": failures,
+    }
+
+
+def calculate_open_interest_change(symbol, interval_seconds=3):
+    import time
+    first = get_open_interest(symbol)
+    time.sleep(interval_seconds)
+    second = get_open_interest(symbol)
+    before = float(first["openInterest"])
+    after = float(second["openInterest"])
+    change_percent = ((after - before) / before) * 100 if before else 0.0
+    return {"symbol": symbol, "oi_before": before, "oi_after": after, "oi_change_percent": round(change_percent, 6)}
