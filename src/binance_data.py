@@ -69,6 +69,17 @@ def calculate_order_book_spread(symbol, limit=20):
     spread_percent = (spread / best_bid * 100) if best_bid else 0.0
     return {"symbol": symbol, "best_bid": best_bid, "best_ask": best_ask, "spread": spread, "spread_percent": spread_percent}
 
+def calculate_order_book_mid_price(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    if not bids or not asks:
+        return {"symbol": symbol, "mid_price": 0.0}
+    best_bid = float(bids[0][0])
+    best_ask = float(asks[0][0])
+    mid_price = (best_bid + best_ask) / 2
+    return {"symbol": symbol, "mid_price": mid_price}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
