@@ -184,3 +184,35 @@ def get_worldwide_crypto_news(limit=20):
         for item in articles
         if item.get("title")
     ][:limit]
+def filter_worldwide_news(articles, symbol=None, max_age_hours=24):
+    import time
+    from datetime import datetime, timezone
+
+    base = (symbol or "").replace("USDT", "").upper()
+    cutoff = time.time() - (max_age_hours * 3600)
+    results = []
+
+    for article in articles or []:
+        title = (article.get("title") or "").strip()
+        if not title:
+            continue
+
+        published = article.get("published_at")
+        fresh = True
+
+        if published:
+            try:
+                dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
+                fresh = dt.timestamp() >= cutoff
+            except (ValueError, TypeError):
+                fresh = True
+
+        relevant = not base or base in title.upper() or "BITCOIN" in title.upper() or "CRYPTO" in title.upper()
+
+        if fresh and relevant:
+            item = dict(article)
+            item["relevant"] = True
+            item["fresh"] = True
+            results.append(item)
+
+    return results
