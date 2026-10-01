@@ -88,6 +88,15 @@ def calculate_order_book_depth(symbol, limit=20):
     ask_depth = sum(float(x[0]) * float(x[1]) for x in asks)
     return {"symbol": symbol, "bid_depth": bid_depth, "ask_depth": ask_depth, "total_depth": bid_depth + ask_depth}
 
+def calculate_order_book_depth_ratio(symbol, limit=20):
+    book = get_order_book(symbol, limit)
+    bids = book.get("bids", [])
+    asks = book.get("asks", [])
+    bid_depth = sum(float(x[0]) * float(x[1]) for x in bids)
+    ask_depth = sum(float(x[0]) * float(x[1]) for x in asks)
+    ratio = (bid_depth / ask_depth) if ask_depth else 0.0
+    return {"symbol": symbol, "bid_depth": bid_depth, "ask_depth": ask_depth, "depth_ratio": ratio}
+
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
