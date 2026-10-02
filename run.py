@@ -40,18 +40,7 @@ def run_once():
     init_db()
     symbols = [s for s in get_usdt_futures_symbols() if s in PRIORITY_SYMBOLS]
     alpha_tokens = get_token_list()
-    hammer_alerts = run_inverted_hammer_alerts(get_usdt_futures_symbols())
-    general_signals = []
-    from src.coin_analysis import analyze_coin
-    from src.signal_engine import process_signal
-    for symbol in symbols:
-        x = analyze_coin(symbol)
-        if x["direction"] != "FLAT":
-            general_signals.append(process_signal(symbol, x["direction"], x["change_percent"]))
-    news_signal_candidates = []
-    from src.binance_news import get_macro_news_signal_candidates
-    for news_signal in get_macro_news_signal_candidates(20):
-        news_signal_candidates.append(process_signal(news_signal["symbol"], news_signal["direction"], news_signal["change_percent"]))
+    hammer_alerts = run_inverted_hammer_alerts(symbols)
     rapid_result = scan_rapid_price_moves()
     news_result = refresh_alpha_catalysts()
     btc_context = get_btc_context()
@@ -82,6 +71,8 @@ def run_inverted_hammer_alerts(symbols):
         results = scan_inverted_hammer(symbol)
         for pattern in results.values():
             if pattern:
+                from src.signal_engine import process_signal
+                process_signal(symbol, "BULLISH", pattern.get("change_percent", 0), pattern.get("timeframe"), pattern.get("candle"), pattern)
                 if process_inverted_hammer_alert(symbol, pattern):
                     alerts_sent += 1
     return alerts_sent

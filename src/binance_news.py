@@ -283,28 +283,6 @@ def get_worldwide_macro_news(limit=20):
     return unique[:limit]
 
 
-def classify_macro_news_signal(article):
-    title=(article.get("title") or "").lower()
-    bullish=("rate cut" in title or "cuts fed" in title or "economic growth" in title or "grew " in title or "pickup" in title or "rate increase can wait" in title)
-    bearish=("rate hike" in title or "rate increase" in title or "inflation rises" in title or "inflation increase" in title or "payrolls collide" in title)
-    if bullish and not bearish:
-        return "BULLISH"
-    if bearish and not bullish:
-        return "BEARISH"
-    return "NEUTRAL"
-
-
-def get_macro_news_signal_candidates(limit=20):
-    news=build_worldwide_news_intelligence(limit=limit,max_age_hours=24)
-    candidates=[]
-    for article in news.get("articles",[]):
-        if article.get("category")!="GLOBAL_MACRO":
-            continue
-        direction=classify_macro_news_signal(article)
-        if direction!="NEUTRAL":
-            candidates.append({"symbol":"BTCUSDT","direction":direction,"change_percent":0.0,"title":article.get("title"),"source":article.get("source"),"category":article.get("category")})
-    return candidates
-
 def build_worldwide_news_intelligence(symbol=None, limit=20, max_age_hours=24):
     crypto_articles = get_worldwide_crypto_news(limit)
     macro_articles = get_worldwide_macro_news(limit)
