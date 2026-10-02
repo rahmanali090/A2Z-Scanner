@@ -1,0 +1,9 @@
+A2Z-SIGNAL-PIPELINE-54
+Alpha: FROZEN/DONE
+Current task: connect existing scan_inverted_hammer -> save_inverted_hammer_candidate -> Telegram send_alert
+Confirmed: scan_inverted_hammer uses completed candle candles[-2] and returns matching timeframe results
+Confirmed: save_inverted_hammer_candidate saves CANDIDATE + INVERTED_HAMMER_DETECTED with duplicate protection
+Current run.py only initializes DB, Binance symbols, Alpha/news, and returns READY; Telegram/signal runner integration is NOT yet added
+Next action: integrate existing signal pipeline into run.py without duplicate logic
+Mode: SIGNAL/ALERT
+NEVER PUSH
