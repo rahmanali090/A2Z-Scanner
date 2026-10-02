@@ -1,0 +1,24 @@
+from src.database import init_db
+from src.binance_data import get_usdt_futures_symbols
+from src.binance_alpha import get_token_list
+
+
+def run_once():
+    init_db()
+    symbols = get_usdt_futures_symbols()
+    alpha_tokens = get_token_list()
+    return {
+        "symbol_count": len(symbols),
+        "alpha_token_count": len(alpha_tokens),
+        "status": "READY",
+        "mode": "PAPER/ALERT",
+    }
+
+
+def main():
+    result = run_once()
+    print(f"A2Z Scanner initialized in {result['mode']} mode.")
+
+
+if __name__ == "__main__":
+    main()
