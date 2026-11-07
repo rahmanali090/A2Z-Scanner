@@ -1,21 +1,21 @@
 import requests
 from .config import BINANCE_BASE_URL
 
-def get_price(symbol):
-    r = requests.get(f"{BINANCE_BASE_URL}/fapi/v1/ticker/price", params={"symbol": symbol}, timeout=10)
+def _bn_get_price(symbol):
+    r = requests.get(f"{BINANCE_BASE_URL}/fapi/v1/ticker/price", params={"symbol": symbol}, timeout=4)
     r.raise_for_status()
     return float(r.json()["price"])
 
-def get_24h_ticker(symbol):
-    r = requests.get(f"{BINANCE_BASE_URL}/fapi/v1/ticker/24hr", params={"symbol": symbol}, timeout=10)
+def _bn_get_24h_ticker(symbol):
+    r = requests.get(f"{BINANCE_BASE_URL}/fapi/v1/ticker/24hr", params={"symbol": symbol}, timeout=4)
     r.raise_for_status()
     return r.json()
 
-def get_klines(symbol, interval, limit=100):
+def _bn_get_klines(symbol, interval, limit=100):
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/klines",
         params={"symbol": symbol, "interval": interval, "limit": limit},
-        timeout=10
+        timeout=4
     )
     r.raise_for_status()
     return r.json()
@@ -24,7 +24,7 @@ def get_open_interest(symbol):
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/openInterest",
         params={"symbol": symbol},
-        timeout=10
+        timeout=4
     )
     r.raise_for_status()
     return r.json()
@@ -33,7 +33,7 @@ def get_funding_rate(symbol):
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/premiumIndex",
         params={"symbol": symbol},
-        timeout=10
+        timeout=4
     )
     r.raise_for_status()
     return r.json()
@@ -42,7 +42,7 @@ def get_order_book(symbol, limit=20):
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/depth",
         params={"symbol": symbol, "limit": limit},
-        timeout=10
+        timeout=4
     )
     r.raise_for_status()
     return r.json()
@@ -120,7 +120,7 @@ def detect_order_book_walls(symbol, limit=20):
 def get_exchange_info():
     r = requests.get(
         f"{BINANCE_BASE_URL}/fapi/v1/exchangeInfo",
-        timeout=10
+        timeout=4
     )
     r.raise_for_status()
     return r.json()
@@ -222,7 +222,7 @@ def detect_inverted_hammer(candle):
         "manual_verification_required": True,
     }
 
-def scan_inverted_hammer(symbol, intervals=("1h", "4h", "6h", "12h", "1d", "1w", "1M"), limit=3):
+def scan_inverted_hammer(symbol, intervals=("30m", "1h", "2h", "4h"), limit=3):
     """Scan the latest completed candle for Inverted Hammer across required timeframes."""
     results = {}
 
@@ -251,21 +251,24 @@ def build_inverted_hammer_trade_levels(pattern):
         return None
 
     entry = float(pattern["close"])
-    stop_loss = float(pattern["low"])
+    try:
+        from src.trend_filter import atr_levels_for_pattern
+        _lv = atr_levels_for_pattern(pattern.get("symbol"), pattern.get("timeframe"), entry)
+        if _lv:
+            return _lv
+    except Exception:
+        pass
+    stop_loss = entry * (1 - 0.015)
     risk = entry - stop_loss
-
-    if entry <= stop_loss or risk <= 0:
-        return None
-
     return {
         "entry": entry,
         "stop_loss": stop_loss,
         "risk": risk,
-        "tp1": entry + (risk * 1.5),
-        "tp2": entry + (risk * 2.0),
+        "tp1": entry * (1 + 0.02),
+        "tp2": entry * (1 + 0.035),
+        "tp3": entry * (1 + 0.05),
     }
-
-def process_inverted_hammer_alert(symbol, pattern):
+def process_inverted_hammer_alert(symbol, pattern, silent=False):
     if not pattern:
         return False
 
@@ -304,7 +307,7 @@ def process_inverted_hammer_alert(symbol, pattern):
     alert_pattern = dict(pattern)
     alert_pattern["symbol"] = symbol
 
-    sent = send_inverted_hammer_alert(alert_pattern, levels)
+    sent = True if silent else send_inverted_hammer_alert(alert_pattern, levels)
 
     if sent:
         mark_inverted_hammer_alert_sent(signal_id)
@@ -426,9 +429,116 @@ def calculate_volume_volatility_intelligence(symbol, interval="1h", limit=100):
 
 
 def calculate_long_short_positioning(symbol, period="1h", limit=30):
-    r=requests.get(f"{BINANCE_BASE_URL}/futures/data/globalLongShortAccountRatio",params={"symbol":symbol,"period":period,"limit":limit},timeout=10); r.raise_for_status(); x=r.json(); z=x[-1] if x else {}
+    r=requests.get(f"{BINANCE_BASE_URL}/futures/data/globalLongShortAccountRatio",params={"symbol":symbol,"period":period,"limit":limit},timeout=4); r.raise_for_status(); x=r.json(); z=x[-1] if x else {}
     return {"symbol":symbol,"period":period,"long_account_percent":float(z.get("longAccount",0))*100,"short_account_percent":float(z.get("shortAccount",0))*100,"long_short_ratio":float(z.get("longShortRatio",0))}
 
 
 def detect_market_anomaly(symbol, interval="1h"):
     x=calculate_volume_volatility_intelligence(symbol,interval); return {"symbol":symbol,"interval":interval,"volume_anomaly":abs(x["volume_change_percent"])>=100,"volatility_anomaly":x["volatility_percent"]>=3,"volume_change_percent":x["volume_change_percent"],"volatility_percent":x["volatility_percent"]}
+
+
+import time as _t
+import functools as _f
+
+
+def _ttl_cache(fn, ttl=45):
+    store = {}
+
+    @_f.wraps(fn)
+    def w(*a, **k):
+        key = (a, tuple(sorted(k.items())))
+        hit = store.get(key)
+        if hit and _t.time() - hit[0] < ttl:
+            return hit[1]
+        v = fn(*a, **k)
+        store[key] = (_t.time(), v)
+        return v
+
+    return w
+
+
+# ---- data layer: OKX -> KuCoin -> Binance ----
+import time as _time
+_OKX_BAR = {"1m":"1m","3m":"3m","5m":"5m","15m":"15m","30m":"30m","1h":"1H","2h":"2H","4h":"4H","6h":"6H","12h":"12H","1d":"1D","3d":"3D","1w":"1W","1M":"1M"}
+_KC_GRAN = {"1m":1,"5m":5,"15m":15,"30m":30,"1h":60,"2h":120,"4h":240,"8h":480,"12h":720,"1d":1440,"1w":10080}
+_IV_MS = {"1m":60000,"3m":180000,"5m":300000,"15m":900000,"30m":1800000,"1h":3600000,"2h":7200000,"4h":14400000,"6h":21600000,"8h":28800000,"12h":43200000,"1d":86400000,"3d":259200000,"1w":604800000}
+
+def _base(symbol):
+    if not symbol.endswith("USDT"):
+        raise ValueError("not a USDT symbol")
+    return symbol[:-4]
+
+def _row(t, o, h, l, c, v, qv, iv):
+    t = int(t)
+    return [t, str(o), str(h), str(l), str(c), str(v), t + _IV_MS.get(iv, 0) - 1, str(qv), 0, "0", "0", "0"]
+
+def _okx_klines(symbol, interval, limit):
+    r = requests.get("https://www.okx.com/api/v5/market/candles", params={"instId": _base(symbol) + "-USDT-SWAP", "bar": _OKX_BAR[interval], "limit": limit}, timeout=6)
+    r.raise_for_status()
+    d = r.json().get("data") or []
+    if not d:
+        raise ValueError("okx empty")
+    return [_row(x[0], x[1], x[2], x[3], x[4], x[6], x[7], interval) for x in d[::-1]]
+
+def _kc_sym(symbol):
+    b = _base(symbol)
+    return ("XBT" if b == "BTC" else b) + "USDTM"
+
+def _kc_klines(symbol, interval, limit):
+    g = _KC_GRAN[interval]
+    now = int(_time.time() * 1000)
+    r = requests.get("https://api-futures.kucoin.com/api/v1/kline/query", params={"symbol": _kc_sym(symbol), "granularity": g, "from": now - limit * g * 60000, "to": now}, timeout=6)
+    r.raise_for_status()
+    d = (r.json().get("data") or [])[-limit:]
+    if not d:
+        raise ValueError("kucoin empty")
+    return [_row(x[0], x[1], x[2], x[3], x[4], x[5], float(x[5]) * float(x[4]), interval) for x in d]
+
+def _okx_ticker(symbol):
+    r = requests.get("https://www.okx.com/api/v5/market/ticker", params={"instId": _base(symbol) + "-USDT-SWAP"}, timeout=6)
+    r.raise_for_status()
+    d = (r.json().get("data") or [None])[0]
+    if not d:
+        raise ValueError("okx empty")
+    last = float(d["last"]); op = float(d["open24h"])
+    vol = float(d["volCcy24h"])
+    return {"symbol": symbol, "lastPrice": str(last), "openPrice": str(op), "highPrice": d["high24h"], "lowPrice": d["low24h"],
+            "priceChange": str(last - op), "priceChangePercent": str((last - op) / op * 100 if op else 0.0),
+            "volume": str(vol), "quoteVolume": str(vol * last)}
+
+def _kc_price(symbol):
+    r = requests.get("https://api-futures.kucoin.com/api/v1/ticker", params={"symbol": _kc_sym(symbol)}, timeout=6)
+    r.raise_for_status()
+    return float(r.json()["data"]["price"])
+
+def get_price(symbol):
+    try:
+        return float(_okx_ticker(symbol)["lastPrice"])
+    except Exception:
+        pass
+    try:
+        return _kc_price(symbol)
+    except Exception:
+        pass
+    return _bn_get_price(symbol)
+
+def get_24h_ticker(symbol):
+    try:
+        return _okx_ticker(symbol)
+    except Exception:
+        return _bn_get_24h_ticker(symbol)
+
+def get_klines(symbol, interval, limit=100):
+    if limit <= 300:
+        for fn in (_okx_klines, _kc_klines):
+            try:
+                c = fn(symbol, interval, limit)
+                if c:
+                    return c
+            except Exception:
+                pass
+    return _bn_get_klines(symbol, interval, limit)
+
+get_klines = _ttl_cache(get_klines)
+get_24h_ticker = _ttl_cache(get_24h_ticker)
+get_exchange_info = _ttl_cache(get_exchange_info, 3600)
