@@ -87,6 +87,8 @@ def process_signal(symbol, direction, change_percent, timeframe=None, candle=Non
         else:
             stop_loss = tp1 = tp2 = tp3 = price
 
+    _sw = (_lv or {}).get("sweep")
+    _sweep_line = ("Sweep: %s @ %s\n" % (_sw["pattern"], _sw["sweep_level"])) if _sw else ""
     price_precision = int(signal.get("coin", {}).get("price_precision", 4) or 4)
     formatted_price = lambda v: f"{v:.{price_precision}f}".rstrip("0").rstrip(".")
     price_text, sl_text = formatted_price(price), formatted_price(stop_loss)
@@ -102,7 +104,7 @@ def process_signal(symbol, direction, change_percent, timeframe=None, candle=Non
         f"TP2 👙: {tp2_text}\n"
         f"TP3 🚀: {tp3_text}\n"
         f"Change: {change_percent}%\n"
-        f"Manual verification required."
+        f"{_sweep_line}Manual verification required."
     )
     import time as _t
     _c=globals().setdefault("_COOL",{})

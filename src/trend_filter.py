@@ -62,9 +62,9 @@ def build_dynamic_trade_levels(entry, candles, side="LONG", atr_multiplier=1.5):
         "entry": entry,
         "stop_loss": entry - g * risk,
         "risk": risk,
-        "tp1": entry + g * risk * 1.5,
-        "tp2": entry + g * risk * 2.5,
-        "tp3": entry + g * risk * 4.0,
+        "tp1": entry + g * risk * 2.0,
+        "tp2": entry + g * risk * 3.0,
+        "tp3": entry + g * risk * 4.5,
     }
 
 def apply_trend_and_levels(symbol, side, price):
@@ -81,8 +81,19 @@ def apply_trend_and_levels(symbol, side, price):
                 return {"blocked": True, "ema_200": ema}
         if not validate_volume_spike(candles[-21:], 1.5):
             return {"blocked": True, "reason": "low_volume", "ema_200": ema}
+        if not verify_multi_timeframe_confluence(symbol, "BULLISH" if side == "LONG" else "BEARISH"):
+            return {"blocked": True, "reason": "no_mtf_confluence", "ema_200": ema}
         lv = build_dynamic_trade_levels(price, candles, side)
+        rm = calculate_institutional_risk_matrix(lv["entry"], lv["stop_loss"], [lv["tp1"], lv["tp2"], lv["tp3"]])
+        if not rm or not rm.get("approved"):
+            return {"blocked": True, "reason": "rrr_too_low", "ema_200": ema}
         lv["ema_200"] = ema
+        try:
+            sw = detect_liquidity_sweep(candles)
+            if sw.get("sweep_detected") and sw.get("direction") == side + "_CANDIDATE":
+                lv["sweep"] = sw
+        except Exception:
+            pass
         return lv
     except Exception:
         return None
@@ -100,3 +111,46 @@ def validate_volume_spike(candles, volume_multiplier=1.5):
         return True
     avg_volume = sum(float(c["volume"]) for c in candles[:-1]) / len(candles[:-1])
     return float(candles[-1]["volume"]) >= avg_volume * volume_multiplier
+
+
+def verify_multi_timeframe_confluence(symbol, required_direction="BULLISH"):
+    votes = []
+    for tf in ("15m", "1h", "4h"):
+        cs = fetch_candles(symbol, tf, 60)[:-1]
+        if len(cs) < 50:
+            return False
+        closes = [c["close"] for c in cs]
+        now = closes[-1]
+        if tf == "15m":
+            d = "BULLISH" if now > closes[-2] else "BEARISH"
+        else:
+            d = "BULLISH" if now > sum(closes[-50:]) / 50 else "BEARISH"
+        votes.append(d == required_direction)
+    return all(votes)
+
+def detect_liquidity_sweep(candles, lookback=20):
+    if len(candles) < lookback + 2:
+        return {"sweep_detected": False, "direction": None}
+    recent = candles[-(lookback + 2):-2]
+    last = candles[-1]
+    swing_high = max(float(c["high"]) for c in recent)
+    swing_low = min(float(c["low"]) for c in recent)
+    if float(last["low"]) < swing_low and float(last["close"]) > swing_low:
+        return {"sweep_detected": True, "pattern": "BEAR_TRAP_LIQUIDITY_SWEEP", "direction": "LONG_CANDIDATE", "sweep_level": swing_low}
+    if float(last["high"]) > swing_high and float(last["close"]) < swing_high:
+        return {"sweep_detected": True, "pattern": "BULL_TRAP_LIQUIDITY_SWEEP", "direction": "SHORT_CANDIDATE", "sweep_level": swing_high}
+    return {"sweep_detected": False, "direction": None}
+
+def calculate_institutional_risk_matrix(entry, stop_loss, targets, account_balance=None, risk_percentage=1.0):
+    risk = abs(entry - stop_loss)
+    if risk <= 0 or not targets:
+        return None
+    rrr = abs(targets[0] - entry) / risk
+    if rrr < 2.0 - 1e-9:
+        return {"approved": False, "reason": "RRR %.2f below 2.0" % rrr}
+    out = {"approved": True, "risk_to_reward_ratio": round(rrr, 2)}
+    if account_balance:
+        amt = account_balance * risk_percentage / 100.0
+        out["risk_amount_usd"] = round(amt, 2)
+        out["position_size_units"] = round(amt / risk, 4)
+    return out
