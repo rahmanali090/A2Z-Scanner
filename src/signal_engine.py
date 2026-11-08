@@ -26,6 +26,14 @@ def enrich_signal(symbol, direction, change_percent):
 
 
 def process_signal(symbol, direction, change_percent, timeframe=None, candle=None, pattern_data=None):
+    import time as _to
+    try:
+        if _to.time() - globals().get("_OUT_T", 0) > 1800:
+            globals()["_OUT_T"] = _to.time()
+            from src.outcome_tracker import evaluate_pending
+            evaluate_pending()
+    except Exception as _oe:
+        print("outcome tracker error:", _oe, flush=True)
     _sd = "LONG" if direction == "BULLISH" else "SHORT" if direction == "BEARISH" else "FLAT"
     import time as _t0
     if timeframe is None and _t0.time() - globals().setdefault("_COOL", {}).get((symbol, _sd), 0) < 14400:

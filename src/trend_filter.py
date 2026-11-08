@@ -67,36 +67,36 @@ def build_dynamic_trade_levels(entry, candles, side="LONG", atr_multiplier=1.5):
         "tp3": entry + g * risk * 4.5,
     }
 
+def build_levels_v2(entry, candles, side="LONG"):
+    atr = calculate_atr(candles, 14)
+    if atr <= 0:
+        return None
+    risk = atr * 2.0
+    g = 1 if side == "LONG" else -1
+    return {
+        "entry": entry,
+        "stop_loss": entry - g * risk,
+        "risk": risk,
+        "tp1": entry + g * risk * 1.0,
+        "tp2": entry + g * risk * 1.5,
+        "tp3": entry + g * risk * 2.0,
+    }
+
 def apply_trend_and_levels(symbol, side, price):
+    if side != "LONG":
+        return {"blocked": True, "reason": "short_disabled"}
     try:
-        candles = fetch_candles(symbol, "1h", 250)[:-1]
-        if price <= 0 or len(candles) < 50:
-            return None
-        closes = [c["close"] for c in candles]
-        ema = calculate_ema(closes, 200)
-        if len(closes) >= 200:
-            if side == "LONG" and price <= ema:
-                return {"blocked": True, "ema_200": ema}
-            if side == "SHORT" and price >= ema:
-                return {"blocked": True, "ema_200": ema}
+        candles = fetch_candles(symbol, "1h", 40)[:-1]
+        if price <= 0 or len(candles) < 22:
+            return {"blocked": True, "reason": "no_data"}
         if not validate_volume_spike(candles[-21:], 1.5):
-            return {"blocked": True, "reason": "low_volume", "ema_200": ema}
-        if not verify_multi_timeframe_confluence(symbol, "BULLISH" if side == "LONG" else "BEARISH"):
-            return {"blocked": True, "reason": "no_mtf_confluence", "ema_200": ema}
-        lv = build_dynamic_trade_levels(price, candles, side)
-        rm = calculate_institutional_risk_matrix(lv["entry"], lv["stop_loss"], [lv["tp1"], lv["tp2"], lv["tp3"]])
-        if not rm or not rm.get("approved"):
-            return {"blocked": True, "reason": "rrr_too_low", "ema_200": ema}
-        lv["ema_200"] = ema
-        try:
-            sw = detect_liquidity_sweep(candles)
-            if sw.get("sweep_detected") and sw.get("direction") == side + "_CANDIDATE":
-                lv["sweep"] = sw
-        except Exception:
-            pass
+            return {"blocked": True, "reason": "low_volume"}
+        lv = build_levels_v2(price, candles, side)
+        if not lv:
+            return {"blocked": True, "reason": "no_atr"}
         return lv
     except Exception:
-        return None
+        return {"blocked": True, "reason": "data_error"}
 
 def atr_levels_for_pattern(symbol, timeframe, entry):
     if not symbol or not timeframe:
