@@ -16,18 +16,19 @@ def send_inverted_hammer_alert(pattern, levels):
     candle_time = datetime.fromtimestamp(
         float(pattern["candle_close_time"]) / 1000,
         tz=ZoneInfo("Asia/Karachi")
-    ).strftime("%I:%M:%S %p PKT")
+    ).strftime("%I:%M:%S %p")
     def fmt(value):
         return f"{float(value):.8f}".rstrip("0").rstrip(".")
     message = (
         "INVERTED HAMMER ALERT\n"
         f"Coin: {pattern['symbol']}\n"
-        f"Timeframe: {pattern['timeframe']}\n"
+        f"Timeframe: {pattern.get('timeframes_text', pattern['timeframe'])}\n"
         f"Candle Time: {candle_time}\n"
         f"Entry: {fmt(levels['entry'])}\n"
-        f"SL: {fmt(levels['stop_loss'])}\n"
-        f"TP1: {fmt(levels['tp1'])}\n"
-        f"TP2: {fmt(levels['tp2'])}\n"
+        f"SL 🧨: {fmt(levels['stop_loss'])}\n"
+f"TP1 {chr(0x1F3AF)}: {fmt(levels[chr(116)+chr(112)+chr(49)])}\n"
+f"TP2 {chr(0x1F459)}: {fmt(levels[chr(116)+chr(112)+chr(50)])}\n"
+f"TP3 {chr(0x1F680)}: {fmt(levels[chr(116)+chr(112)+chr(51)])}\n"
         "! Reason: Completed Inverted Hammer\n"
         "Manual verification required."
     )

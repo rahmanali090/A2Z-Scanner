@@ -18,7 +18,7 @@ def get_announcements(catalog_id=161, page_no=1, page_size=20):
     }
     r = requests.get(BINANCE_ANNOUNCEMENT_URL, params=params, headers=headers, timeout=10)
     r.raise_for_status()
-    return r.json()
+    data = r.json(); c = data.get("data", {}).get("catalogs", []); return c[0].get("articles", []) if c else []
 
 def save_announcements(catalog_id=161, page_no=1, page_size=20):
     import json
@@ -27,8 +27,9 @@ def save_announcements(catalog_id=161, page_no=1, page_size=20):
 
     response = get_announcements(catalog_id, page_no, page_size)
     catalogs = response.get("data", {}).get("catalogs", [])
-    articles = catalogs[0].get("articles", []) if catalogs else []
     received_at = time.time()
+    candidates = []
+    candidates = []
 
     for article in articles:
         save_news_event(
@@ -52,21 +53,24 @@ def filter_alpha_news(articles):
         if any(k in article.get("title", "").lower() for k in keywords)
     ]
 
-def refresh_alpha_catalysts(catalog_id=161, page_no=1, page_size=20):
+def refresh_alpha_catalysts(catalog_id=93, page_no=1, page_size=20, return_candidates=False):
     import json
     import time
     from .database import get_connection, save_news_event
 
     response = get_announcements(catalog_id, page_no, page_size)
-    catalogs = response.get("data", {}).get("catalogs", [])
-    articles = catalogs[0].get("articles", []) if catalogs else []
+    articles = response if isinstance(response, list) else []
     matches = filter_alpha_news(articles)
+    candidates = []
     received_at = time.time()
 
     for article in matches:
+        source_id = str(article.get("id"))
+        from src.database import get_connection
+        existing = get_connection().execute("SELECT news_id FROM news_events WHERE source = ? AND source_id = ?", ("BINANCE_OFFICIAL", source_id)).fetchone()
         news_id = save_news_event(
             source="BINANCE_OFFICIAL",
-            source_id=str(article.get("id")),
+            source_id=source_id,
             title=article.get("title", ""),
             symbol=None,
             published_at=article.get("releaseDate"),
@@ -78,6 +82,9 @@ def refresh_alpha_catalysts(catalog_id=161, page_no=1, page_size=20):
 
         tokens = extract_alpha_tokens(article.get("title", ""))
 
+        if existing:
+            continue
+
         if news_id and tokens:
             conn = get_connection()
             for token in tokens:
@@ -88,8 +95,10 @@ def refresh_alpha_catalysts(catalog_id=161, page_no=1, page_size=20):
                 )
             conn.commit()
             conn.close()
+            for token in tokens:
+                candidates.append({'news_id': news_id, 'symbol': token, 'title': article.get('title', '')})
 
-    return len(matches)
+    return candidates if return_candidates else len(matches)
 
 def extract_alpha_tokens(title):
     import re
@@ -282,6 +291,28 @@ def get_worldwide_macro_news(limit=20):
             unique.append(item)
     return unique[:limit]
 
+
+def classify_macro_news_signal(article):
+    title=(article.get("title") or "").lower()
+    bullish=("rate cut" in title or "cuts fed" in title or "economic growth" in title or "grew " in title or "pickup" in title or "rate increase can wait" in title)
+    bearish=("rate hike" in title or "rate increase" in title or "inflation rises" in title or "inflation increase" in title or "payrolls collide" in title)
+    if bullish and not bearish:
+        return "BULLISH"
+    if bearish and not bullish:
+        return "BEARISH"
+    return "NEUTRAL"
+
+
+def get_macro_news_signal_candidates(limit=20):
+    news=build_worldwide_news_intelligence(limit=limit,max_age_hours=24)
+    candidates=[]
+    for article in news.get("articles",[]):
+        if article.get("category")!="GLOBAL_MACRO":
+            continue
+        direction=classify_macro_news_signal(article)
+        if direction!="NEUTRAL":
+            candidates.append({"symbol":"BTCUSDT","direction":direction,"change_percent":0.0,"title":article.get("title"),"source":article.get("source"),"category":article.get("category")})
+    return candidates
 
 def build_worldwide_news_intelligence(symbol=None, limit=20, max_age_hours=24):
     crypto_articles = get_worldwide_crypto_news(limit)
